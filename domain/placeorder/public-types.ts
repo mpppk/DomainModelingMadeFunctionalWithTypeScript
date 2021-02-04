@@ -2,8 +2,7 @@
 // rather than a module at the top level
 
 import {
-    BillingAmount,
-    EmailAddress,
+    BillingAmount, EmailAddress,
     FixMe,
     OrderId,
     OrderLineId,
@@ -95,6 +94,8 @@ export type ValidationError = {errType: 'Validation', msg: string}
 export const createValidationError = (msg: string): ValidationError => ({errType: 'Validation', msg});
 
 export type PricingError = {errType: 'Pricing', msg: string}
+export const createPricingError = (msg: string): PricingError => ({errType: 'Pricing', msg})
+
 
 export type URI = string
 export interface ServiceInfo {

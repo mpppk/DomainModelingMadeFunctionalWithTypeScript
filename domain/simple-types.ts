@@ -59,7 +59,30 @@ export interface PdfAttachment {
 // Reusable constructors and getters for constrained types
 // ===============================
 
-type Err = {msg: string};
+export type Primitive = string | number | boolean | symbol | bigint | null | undefined;
+export type Err = {msg: string, errType: string};
+export type NotErr = Primitive | Omit<object, 'errType'>;
+export const isErr = (e: Primitive | object): e is Err => {
+    switch(typeof e) {
+        case 'string':
+        case 'number':
+        case 'boolean':
+        case 'symbol':
+        case 'bigint':
+        case 'undefined':
+            return false;
+        case 'object':
+            if (e === null) return false;
+            return 'errType' in e;
+        default: const _: never = e; return _;
+    }
+}
+
+export function splitErr<T extends NotErr | Err, SomeErr extends Err = Err>(errs: Array<T | SomeErr>): [T[], SomeErr[]] {
+    const isSomeErr = (e: T | SomeErr): e is SomeErr => isErr(e);
+    const isNotErr = (e: T | SomeErr): e is T => !isErr(e);
+    return [errs.filter(isNotErr), errs.filter(isSomeErr)]
+}
 
 // Useful functions for constrained types
 namespace ConstrainedType {
@@ -253,4 +276,8 @@ export namespace BillingAmount {
     export const value = (v: BillingAmount): number => v;
     export const create = (v: number): BillingAmount | CreateDecimalError  =>
         ConstrainedType.createDecimal('BillingAmount', 0, 10000, v);
+    export const sumPrices = (prices: number[]) => {
+        const total = prices.reduce((prev, cur) => prev+cur, 0);
+        return create(total);
+    }
 }
