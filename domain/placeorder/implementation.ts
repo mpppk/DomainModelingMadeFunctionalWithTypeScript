@@ -14,9 +14,12 @@ import {
 } from "../simple-types";
 import {Address, CustomerInfo} from "../compound-types";
 import {
+    BillableOrderPlaced,
     createPricingError,
     createValidationError,
     OrderAcknowledgmentSent,
+    OrderPlaced,
+    PlaceOrder,
     PlaceOrderEvent,
     PricedOrder,
     PricedOrderLine,
@@ -285,3 +288,63 @@ const priceOrder: PriceOrder = (getProductPrice, validatedOrder) => {
 // AcknowledgeOrder step
 // ---------------------------
 
+const acknowledgeOrder: AcknowledgeOrder = (createOrderAcknowledgmentLetter, sendOrderAcknowledgment, pricedOrder) => {
+    const letter = createOrderAcknowledgmentLetter(pricedOrder);
+    const acknowledgment = {emailAddress: pricedOrder.customerInfo.emailAddress, letter}
+
+    // if the acknowledgement was successfully sent,
+    // return the corresponding event, else return null
+    switch (sendOrderAcknowledgment(acknowledgment)) {
+        case "Sent":
+            return {orderId: pricedOrder.orderId, emailAddress: pricedOrder.customerInfo.emailAddress};
+        case "NotSent":
+            return null;
+    }
+};
+
+// ---------------------------
+// Create events
+// ---------------------------
+
+const createOrderPlacedEvent = (placedOrder: PricedOrder): OrderPlaced => placedOrder;
+
+const createBillingEvent = (placedOrder: PricedOrder): BillableOrderPlaced | null => {
+    const billingAmount = BillingAmount.value(placedOrder.amountToBill);
+    if (billingAmount > 0) {
+        return {
+            orderId: placedOrder.orderId,
+            billingAddress: placedOrder.billingAddress,
+            amountToBill: placedOrder.amountToBill
+        }
+    }
+    return null;
+}
+
+// helper to convert an Option into a List
+const listOfOption = <T>(opt: T | null): T[] =>  opt === null ? []: [opt];
+
+const createEvents: CreateEvents = (pricedOrder, orderAcknowledgmentEventOpt) => {
+    const acknowledgmentEvents = listOfOption(orderAcknowledgmentEventOpt);
+    const orderPlacedEvents = [createOrderPlacedEvent(pricedOrder)];
+    const billingEvents = listOfOption(createBillingEvent(pricedOrder));
+    // return all the events
+    return [...acknowledgmentEvents, ...orderPlacedEvents, ...billingEvents];
+}
+
+// ---------------------------
+// overall workflow
+// ---------------------------
+export const placeOrder = (checkProductExists: CheckProductCodeExists,
+                    checkAddressExists: CheckAddressExists,
+                    getProductPrice: GetProductPrice,
+                    createOrderAcknowledgmentLetter: CreateOrderAcknowledgmentLetter,
+                    sendOrderAcknowledgment: SendOrderAcknowledgment): PlaceOrder => {
+    return async (unvalidatedOrder: UnvalidatedOrder) => {
+        const validatedOrder = await validateOrder(checkProductExists, checkAddressExists, unvalidatedOrder);
+        if (isErr(validatedOrder)) return validatedOrder;
+        const pricedOrder = priceOrder(getProductPrice, validatedOrder);
+        if (isErr(pricedOrder)) return pricedOrder;
+        const acknowledgementOption = acknowledgeOrder(createOrderAcknowledgmentLetter, sendOrderAcknowledgment, pricedOrder);
+        return createEvents(pricedOrder, acknowledgementOption);
+    }
+}

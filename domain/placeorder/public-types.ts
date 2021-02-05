@@ -110,4 +110,4 @@ export type PlaceOrderError = ValidationError | PricingError | RemoteServiceErro
 // ------------------------------------
 // the workflow itself
 
-type PlaceOrder = (unvalidatedOrder: UnvalidatedOrder) => Promise<PlaceOrderEvent[] | PlaceOrderError>
+export type PlaceOrder = (unvalidatedOrder: UnvalidatedOrder) => Promise<PlaceOrderEvent[] | PlaceOrderError>
